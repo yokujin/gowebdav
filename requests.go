@@ -12,8 +12,12 @@ import (
 func (c *Client) req(method, path string, body io.Reader, intercept func(*http.Request)) (req *http.Response, err error) {
 	// Tee the body, because if authorization fails we will need to read from it again.
 	var r *http.Request
+	var localCopy bytes.Buffer
+	if body != nil {
+		io.Copy(&localCopy, body)
+	}
 	var ba bytes.Buffer
-	bb := io.TeeReader(body, &ba)
+	bb := io.TeeReader(&localCopy, &ba)
 
 	if body == nil {
 		r, err = http.NewRequest(method, PathEscape(Join(c.root, path)), nil)
@@ -33,6 +37,7 @@ func (c *Client) req(method, path string, body io.Reader, intercept func(*http.R
 		}
 	}
 
+	r.ContentLength = int64(localCopy.Len())
 	if intercept != nil {
 		intercept(r)
 	}
